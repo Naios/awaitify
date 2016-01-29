@@ -14,7 +14,7 @@
 
 #if !defined(AWAITIFY_PROVIDE_FUTURE_TYPE) || \
     !defined(AWAITIFY_PROVIDE_PROMISED_TYPE)
-  // Provide the boost future and promise implementation
+  // Provide the boost future_t and promise_t implementation
   // when no custom type is used.
   #define BOOST_THREAD_PROVIDES_FUTURE
   #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
@@ -36,32 +36,32 @@
 #endif // AWAITIFY_NO_KEYWORD_MACRO
 
 namespace awf {
-// Provide your own future type through
+// Provide your own future_t type through
 // defining AWAITIFY_PROVIDE_FUTURE_TYPE.
 // The interface of the given type needs to match
 // the one from boost::future.
 #ifndef AWAITIFY_PROVIDE_FUTURE_TYPE
   /// \brief Future type from boost
   template<typename T>
-  using future = boost::future<T>;
+  using future_t = boost::future<T>;
 #else
   /// \brief Future provided from AWAITIFY_PROVIDE_PROMISE_TYPE
   template<typename T>
-  using future = AWAITIFY_PROVIDE_FUTURE_TYPE <T>;
+  using future_t = AWAITIFY_PROVIDE_FUTURE_TYPE <T>;
 #endif // AWAITIFY_PROVIDE_FUTURE_TYPE
 
-// Provide your own promise type through
+// Provide your own promise_t type through
 // defining AWAITIFY_PROVIDE_PROMISE_TYPE.
 // The interface of the given type needs to match
 // the one from boost::promise.
 #ifndef AWAITIFY_PROVIDE_PROMISE_TYPE
   /// \brief Promise type from boost
   template<typename T>
-  using promise = boost::promise<T>;
+  using promise_t = boost::promise<T>;
 #else
   /// \brief Promise provided from AWAITIFY_PROVIDE_PROMISE_TYPE
   template<typename T>
-  using promise = AWAITIFY_PROVIDE_PROMISE_TYPE <T>;
+  using promise_t = AWAITIFY_PROVIDE_PROMISE_TYPE <T>;
 #endif // AWAITIFY_PROVIDE_PROMISE_TYPE
 
 // Provide your own executor type through
@@ -94,6 +94,7 @@ namespace awf {
 
   public:
     execution_context() { }
+    virtual ~execution_context() { }
     execution_context(execution_context const&) = delete;
     execution_context(execution_context&&) = delete;
     execution_context& operator= (execution_context const&) = delete;
@@ -124,13 +125,13 @@ namespace awf {
 
   private:
     template<typename Task, typename Promise>
-    void invoke(std::true_type, Task&& task, Promise* promise)
+    void invoke(std::true_type /*void*/, Task&& task, Promise* promise)
     {
       std::forward<Task>(task)();
       promise->set_value();
     }
     template<typename Task, typename Promise>
-    void invoke(std::false_type, Task&& task, Promise* promise)
+    void invoke(std::false_type /*non void*/, Task&& task, Promise* promise)
     {
       promise->set_value(std::forward<Task>(task)());
     }
@@ -142,7 +143,7 @@ namespace awf {
   {
     friend class execution_context;
 
-    promise<T> promise_;
+    promise_t<T> promise_;
 
   public:
     specific_execution_context() { }
@@ -152,42 +153,41 @@ namespace awf {
 
   using shared_execution_context = std::shared_ptr<execution_context>;
 
-  shared_execution_context* current_execution_context();
+  shared_execution_context& current_execution_context();
 
   template<typename T>
-  T _awaitify_impl_ (future<T>&& future_)
+  T _awaitify_impl_ (future_t<T>&& future_)
   {
       assert(future_.valid() &&
-             "The given future is invalid!");
+             "The given future_t is invalid!");
 
-      // Return the future immediately if it's ready
+      // Return the future_t immediately if it's ready
       if (future_.is_ready())
         return future_.get();
 
       // Suspend the context
       auto f = future_.then(
-        [coroutine = *current_execution_context()](future<T> future_)
+        [context = current_execution_context()](future_t<T> future)
       {
-        system_scheduler().post([coroutine]
+        system_scheduler().post([context]
         {
-          assert(coroutine &&
+          assert(context &&
                  "Execution context is invalid!");
-          printf("resuming\n");
-          coroutine->resume();
+          context->resume();
         });
-        return future_.get();
+        return future.get();
       });
-      assert((*current_execution_context()) &&
+      assert(current_execution_context() &&
              "Await isn't dispatched in a coroutine!" &&
              "Use `asyncify` to create an awaitable context!");
-      (*current_execution_context())->suspend();
+      current_execution_context()->suspend();
       return f.get();
   }
 
   struct _awaiter_impl
   {
     template<typename T>
-    T operator<< (future<T>&& future) const
+    T operator<< (future_t<T>&& future) const
     {
       return _awaitify_impl_(std::move(future));
     }
@@ -196,16 +196,16 @@ namespace awf {
   template<typename T>
   auto awaitify(T&& task)
   {
-    using Result = std::decay_t<decltype(task())>;
+    using result_t = std::decay_t<decltype(std::forward<T>(task)())>;
 
     auto context = std::make_shared<
-      specific_execution_context<Result>>();
+      specific_execution_context<result_t>>();
 
     auto future = context->get_future();
     system_scheduler().post([c = std::move(context),
                              t = std::forward<T>(task)] () mutable
     {
-      c->set_task<Result>(std::forward<T>(t));
+      c->set_task<result_t>(std::forward<T>(t));
     });
     return future;
   }
