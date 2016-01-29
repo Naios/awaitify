@@ -1,0 +1,52 @@
+sudo: false
+language: cpp
+cache: apt
+
+git:
+  depth: 1
+
+matrix:
+  include:
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['g++-4.9', 'valgrind']
+      env: COMPILER=g++-4.9
+
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['g++-5', 'valgrind']
+      env: COMPILER=g++-5
+
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-precise-3.6']
+          packages: ['clang-3.6', 'valgrind']
+      env: COMPILER=clang++-3.6
+
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test', 'llvm-toolchain-precise-3.7']
+          packages: ['clang-3.7', 'valgrind']
+      env: COMPILER=clang++-3.7
+
+install:
+  - export CXX=$COMPILER
+  - $CXX --version
+
+  - mkdir bin
+  - cd bin
+  - cmake .. -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror" -DCMAKE_BUILD_TYPE=Debug -DWITH_TESTS
+
+script:
+  - make -j2
+  - valgrind --error-exitcode=1 --leak-check=full --show-reachable=yes ./awaitify_tests
