@@ -89,8 +89,8 @@ namespace awf {
   {
     using coro_t = boost::coroutines2::coroutine<void>;
 
-    boost::optional<coro_t::pull_type> pull_;
-    coro_t::push_type* push_;
+    boost::optional<coro_t::push_type> push_;
+    coro_t::pull_type* pull_;
 
   public:
     execution_context() { }
@@ -105,12 +105,12 @@ namespace awf {
     {
       weak_enter();
 
-      pull_ = coro_t::pull_type(
+      push_ = coro_t::push_type(
         [ task = std::forward<Task>(task),
           me = shared_from_this() ]
-        (boost::coroutines2::coroutine<void>::push_type& push) mutable
+        (coro_t::pull_type& pull) mutable
       {
-        me->push_ = &push;
+        me->pull_ = &pull;
         me->invoke(std::is_same<decltype(task()), void>{},
           std::move(task),
           &static_cast<specific_execution_context<Result>*>(
@@ -206,6 +206,7 @@ namespace awf {
                              t = std::forward<T>(task)] () mutable
     {
       c->set_task<result_t>(std::forward<T>(t));
+      c->resume();
     });
     return future;
   }

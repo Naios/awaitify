@@ -22,30 +22,30 @@ namespace awf {
 
   void execution_context::weak_enter()
   {
-    /*assert(!current_execution_context() &&
-           "Context already in use!");*/
+    assert(!current_execution_context() &&
+           "Context already in use!");
     current_execution_context() = shared_from_this();
   }
 
   void execution_context::resume()
   {
     weak_enter();
-    (*pull_)();
+    (*push_)();
     weak_leave();
   }
 
   void execution_context::weak_leave()
   {
-    /*assert(current_execution_context() &&
-           "No context in use!");*/
+    assert(current_execution_context() &&
+           "No context in use!");
     current_execution_context().reset();
   }
 
   void execution_context::suspend()
   {
-    /*assert(current_execution_context() &&
-            "Invalid context of execution.");*/
+    assert(current_execution_context() &&
+           "Invalid context of execution.");
 
-    (*push_)();
+    (*pull_)();
   }
 }
