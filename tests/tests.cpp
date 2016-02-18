@@ -1,10 +1,15 @@
 
+//  Copyright 2015-2016 Denis Blank <denis.blank at outlook dot com>
+//     Distributed under the Boost Software License, Version 1.0
+//       (See accompanying file LICENSE_1_0.txt or copy at
+//             http://www.boost.org/LICENSE_1_0.txt)
+
 #include "awaitify/awaitify.hpp"
 
 #include <atomic>
 #include <thread>
 #include <boost/thread.hpp>
-#include <boost/asio/signal_set.hpp>
+#include <boost/asio.hpp>
 
 #define CATCH_CONFIG_RUNNER
 #include "catch/catch.hpp"
@@ -201,10 +206,56 @@ TEST_CASE("Awaitify & await tests", "[awaitify & await]")
   }
 }
 
+TEST_CASE("load test", "[executor]")
+{
+  SECTION("load")
+  {
+    for (int i = 0; i < 1000; ++i)
+    {
+        /*
+        try
+        {
+          awaitify([]
+          {
+            try
+            {
+
+              int res1 = await invoke([] { return 0; });
+            }
+            catch(std::exception const& e)
+            {
+              auto msg = e.what();
+
+              int iiiiii = 0;
+            }
+            // int res2 = await invoke([] { return 0; });
+          });
+        }
+        catch(std::exception const& e)
+        {
+          auto msg = e.what();
+
+          int iiiiii = 0;
+        }*/
+
+        system_scheduler().post([]
+        {
+          awaitify([]
+          {
+            await invoke([] { return 0; });
+          });
+        });
+    }
+
+    int iiiii = 0;
+  }
+}
+
 TEST_CASE("Executor suspender", "[executor]")
 {
   SECTION("Stop the executor")
   {
     work.reset();
+    system_scheduler().stop();
   }
 }

@@ -169,12 +169,15 @@ namespace awf {
       auto f = future_.then(
         [context = current_execution_context()](future_t<T> future)
       {
-        system_scheduler().post([context]
-        {
-          assert(context &&
-                 "Execution context is invalid!");
-          context->resume();
-        });
+        // Don't dispatch the continuation
+        // when the executor was stopped
+        if (!system_scheduler().stopped())
+          system_scheduler().post([context]
+          {
+            assert(context &&
+                   "Execution context is invalid!");
+            context->resume();
+          });
         return future.get();
       });
       assert(current_execution_context() &&
